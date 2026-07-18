@@ -1,0 +1,6 @@
+*.exe
+*.test
+*.out
+.vscode/
+results.json
+przejscie_na_binarki_testy.md

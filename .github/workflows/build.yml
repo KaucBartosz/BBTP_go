@@ -1,0 +1,154 @@
+name: Build Native Go Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-native:
+    name: ${{ matrix.artifact }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            ext: .exe
+            artifact: windows-amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            ext: ""
+            artifact: linux-amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            ext: ""
+            artifact: linux-arm64
+            use_docker: true
+          - os: macos-13
+            goos: darwin
+            goarch: amd64
+            ext: ""
+            artifact: darwin-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            ext: ""
+            artifact: darwin-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        if: ${{ !matrix.use_docker }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: BBTP_go/go.sum
+
+      - name: Install Linux dependencies (amd64)
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglfw3-dev libgl1-mesa-dev \
+            libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev
+
+      - name: Set up QEMU for linux/arm64
+        if: matrix.use_docker
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build linux/arm64 (via Docker + QEMU)
+        if: matrix.use_docker
+        run: |
+          TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace/BBTP_go \
+            arm64v8/golang:1.26-bookworm \
+            bash -c "
+              apt-get update && apt-get install -y libglfw3-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev >/dev/null 2>&1
+              mkdir -p /workspace/output/linux-arm64
+              for test in $TESTS; do
+                echo \"Building \$test...\"
+                go build -o /workspace/output/linux-arm64/\$test ./cmd/\$test
+              done
+            "
+
+      - name: Build all tests (native)
+        if: ${{ !matrix.use_docker }}
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        working-directory: BBTP_go
+        run: |
+          TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
+          for test in $TESTS; do
+            echo "Building $test..."
+            go build -o "${{ runner.temp }}/pack/$test/$test${{ matrix.ext }}" "./cmd/$test"
+          done
+
+      - name: Package tests
+        shell: bash
+        working-directory: BBTP_go
+        run: |
+          TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
+          EXT="${{ matrix.ext }}"
+          ARTIFACT="${{ matrix.artifact }}"
+
+          # Determine binary source: Docker build puts output elsewhere
+          if [ "${{ matrix.use_docker }}" = "true" ]; then
+            BIN_SRC="${{ github.workspace }}/output/linux-arm64"
+          else
+            BIN_SRC="${{ runner.temp }}/pack"
+          fi
+
+          for test in $TESTS; do
+            testDir="${{ runner.temp }}/pack/$test"
+            mkdir -p "$testDir"
+
+            # Copy binary if from Docker build
+            if [ "${{ matrix.use_docker }}" = "true" ]; then
+              cp "$BIN_SRC/$test" "$testDir/$test"
+            fi
+
+            # Read name and description from tests-metadata.json
+            NAME=$(jq -r ".[\"$test\"].name // \"$test\"" tests-metadata.json)
+            DESC=$(jq -r ".[\"$test\"].description // \"Brak opisu\"" tests-metadata.json)
+
+            # Write meta.json
+            cat > "$testDir/meta.json" <<EOF
+{
+  "name": "$NAME",
+  "version": 1,
+  "description": "$DESC",
+  "lastUpdated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "nativeBinary": true
+}
+EOF
+
+            # Create individual zip with binary
+            cd "${{ runner.temp }}/pack"
+            zip -j "$test-$ARTIFACT.zip" "$test/$test$EXT"
+
+            # Create .txt file with description
+            printf "%s\n" "$DESC" > "$test.txt"
+
+            cd "${{ github.workspace }}/BBTP_go"
+          done
+
+          # Copy tests-metadata.json for reference in artifact
+          cp tests-metadata.json "${{ runner.temp }}/pack/tests-metadata.json"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nous-tests-${{ matrix.artifact }}
+          path: ${{ runner.temp }}/pack/*
+          if-no-files-found: error
