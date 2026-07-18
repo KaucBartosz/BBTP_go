@@ -164,22 +164,20 @@ jobs:
         with:
           path: ${{ runner.temp }}/artifacts
 
-      - name: Collect per-test zip files and create release
+      - name: Collect per-test files and create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Gather all per-test zip files from all platform artifacts
           mkdir -p ${{ runner.temp }}/release
-          find ${{ runner.temp }}/artifacts -name '*.zip' -type f | while read f; do
-            basename=$(basename "$f")
-            # Only include per-test zips (not platform-level combos)
-            cp "$f" "${{ runner.temp }}/release/$basename"
+          # Gather per-test zips and txt files from all platform artifacts
+          find ${{ runner.temp }}/artifacts \( -name '*.zip' -o -name '*.txt' \) -type f | while read f; do
+            cp "$f" "${{ runner.temp }}/release/"
           done
 
-          # Create GitHub Release and upload assets
           TAG=${GITHUB_REF#refs/tags/}
           gh release create "$TAG" \
             --repo ${{ github.repository }} \
             --title "BBTP_go $TAG" \
             --notes "Zbudowano: $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            ${{ runner.temp }}/release/*.zip
+            ${{ runner.temp }}/release/*.zip \
+            ${{ runner.temp }}/release/*.txt
