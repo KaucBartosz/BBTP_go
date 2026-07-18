@@ -39,4 +39,84 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - run: echo ok
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache-dependency-path: go.sum
+
+      - name: Install Linux dependencies (amd64)
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libglfw3-dev libgl1-mesa-dev \
+            libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev
+
+      - name: Build all tests
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
+          for test in $TESTS; do
+            mkdir -p "${{ runner.temp }}/pack/$test"
+            go build -o "${{ runner.temp }}/pack/$test/$test${{ matrix.ext }}" "./cmd/$test"
+          done
+
+      - name: Package tests
+        shell: bash
+        run: |
+          TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
+          EXT="${{ matrix.ext }}"
+          ARTIFACT="${{ matrix.artifact }}"
+
+          for test in $TESTS; do
+            testDir="${{ runner.temp }}/pack/$test"
+            mkdir -p "$testDir"
+
+            export TEST="$test"
+            export TEST_DIR="$testDir"
+            export TEST_EXT="$EXT"
+            export TEST_ARTIFACT="$ARTIFACT"
+            export PACK_DIR="${{ runner.temp }}/pack"
+            export META_FILE="${{ github.workspace }}/tests-metadata.json"
+
+            python3 << 'PYEOF'
+import json, os, pathlib, zipfile
+from datetime import datetime
+
+test = os.environ['TEST']
+test_dir = os.environ['TEST_DIR']
+ext = os.environ['TEST_EXT']
+artifact = os.environ['TEST_ARTIFACT']
+pack_dir = os.environ['PACK_DIR']
+meta_file = os.environ['META_FILE']
+
+data = json.load(open(meta_file, encoding='utf-8'))
+meta = data.get(test, {})
+name = meta.get('name', test)
+desc = meta.get('description', 'Brak opisu')
+timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+
+out = {'name': name, 'version': 1, 'description': desc, 'lastUpdated': timestamp, 'nativeBinary': True}
+json.dump(out, open(os.path.join(test_dir, 'meta.json'), 'w'), indent=2, ensure_ascii=False)
+
+pathlib.Path(os.path.join(pack_dir, f'{test}.txt')).write_text(desc, encoding='utf-8')
+
+src = os.path.join(test_dir, f'{test}{ext}')
+dst = os.path.join(pack_dir, f'{test}-{artifact}.zip')
+with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as zf:
+    zf.write(src, os.path.basename(src))
+PYEOF
+          done
+
+          cp "${{ github.workspace }}/tests-metadata.json" "${{ runner.temp }}/pack/tests-metadata.json"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nous-tests-${{ matrix.artifact }}
+          path: ${{ runner.temp }}/pack/*
+          if-no-files-found: error
