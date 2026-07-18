@@ -119,27 +119,25 @@ jobs:
               cp "$BIN_SRC/$test" "$testDir/$test"
             fi
 
-            # Read name and description from tests-metadata.json
+            # Read name and description from tests-metadata.json (export for jq)
             NAME=$(jq -r ".[\"$test\"].name // \"$test\"" tests-metadata.json)
             DESC=$(jq -r ".[\"$test\"].description // \"Brak opisu\"" tests-metadata.json)
+            export NAME DESC
 
-            # Write meta.json
-            cat > "$testDir/meta.json" <<EOF
-{
-  "name": "$NAME",
-  "version": 1,
-  "description": "$DESC",
-  "lastUpdated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "nativeBinary": true
-}
-EOF
+            # Write meta.json safely using jq (handles special chars)
+            jq -n \
+              --arg name "$NAME" \
+              --arg desc "$DESC" \
+              --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{name: $name, version: 1, description: $desc, lastUpdated: $date, nativeBinary: true}' \
+              > "$testDir/meta.json"
 
             # Create individual zip with binary
             cd "${{ runner.temp }}/pack"
             zip -j "$test-$ARTIFACT.zip" "$test/$test$EXT"
 
-            # Create .txt file with description
-            printf "%s\n" "$DESC" > "$test.txt"
+            # Create .txt file with description (printf is safe with %s)
+            printf '%s\n' "$DESC" > "$test.txt"
 
             cd "${{ github.workspace }}/BBTP_go"
           done
