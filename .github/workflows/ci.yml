@@ -1,5 +1,10 @@
 name: Build Native Go Tests
-on: workflow_dispatch
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request: {}
+  workflow_dispatch: {}
 jobs:
   build:
     runs-on: ubuntu-latest
