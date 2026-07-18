@@ -3,7 +3,6 @@ name: Build Native Go Tests
 on:
   push:
     branches: [master]
-    tags: ['v*']
   pull_request: {}
   workflow_dispatch: {}
 
@@ -90,7 +89,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: [build-native]
     runs-on: ubuntu-latest
     permissions:
@@ -103,7 +102,7 @@ jobs:
         with:
           path: ${{ runner.temp }}/artifacts
 
-      - name: Collect per-test files and create release
+      - name: Collect files and create/update latest release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -111,10 +110,32 @@ jobs:
           find ${{ runner.temp }}/artifacts \( -name '*.zip' -o -name '*.txt' \) -type f | while read f; do
             cp "$f" "${{ runner.temp }}/release/"
           done
-          TAG=${GITHUB_REF#refs/tags/}
-          gh release create "$TAG" \
+
+          # Delete existing 'latest' release if present (to update assets)
+          gh release delete latest --repo ${{ github.repository }} --yes --cleanup-tag 2>/dev/null || true
+
+          # Create new 'latest' release
+          gh release create latest \
             --repo ${{ github.repository }} \
-            --title "BBTP_go $TAG" \
-            --notes "Zbudowano: $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --title "Latest Build" \
+            --notes "Automatyczny build: $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --latest \
             ${{ runner.temp }}/release/*.zip \
             ${{ runner.temp }}/release/*.txt
+
+      - name: Keep only 5 latest releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get all releases sorted by creation date (newest first), skip 'latest' and first 5
+          RELEASES=$(gh release list --repo ${{ github.repository }} --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[].tagName' | grep -v '^latest$')
+
+          COUNT=0
+          for TAG in $RELEASES; do
+            COUNT=$((COUNT + 1))
+            if [ $COUNT -gt 5 ]; then
+              echo "Deleting old release: $TAG"
+              gh release delete "$TAG" --repo ${{ github.repository }} --yes --cleanup-tag 2>/dev/null || true
+            fi
+          done
