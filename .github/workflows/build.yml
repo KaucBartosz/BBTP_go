@@ -51,7 +51,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.26'
-          cache-dependency-path: BBTP_go/go.sum
+          cache-dependency-path: go.sum
 
       - name: Install Linux dependencies (amd64)
         if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
@@ -70,7 +70,7 @@ jobs:
           TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
           docker run --rm --platform linux/arm64 \
             -v ${{ github.workspace }}:/workspace \
-            -w /workspace/BBTP_go \
+            -w /workspace \
             arm64v8/golang:1.26-bookworm \
             bash -c "
               apt-get update && apt-get install -y libglfw3-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev >/dev/null 2>&1
@@ -87,7 +87,6 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        working-directory: BBTP_go
         run: |
           TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
           for test in $TESTS; do
@@ -97,7 +96,6 @@ jobs:
 
       - name: Package tests
         shell: bash
-        working-directory: BBTP_go
         run: |
           TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
           EXT="${{ matrix.ext }}"
@@ -139,11 +137,11 @@ jobs:
             # Create .txt file with description (printf is safe with %s)
             printf '%s\n' "$DESC" > "$test.txt"
 
-            cd "${{ github.workspace }}/BBTP_go"
+            cd "${{ github.workspace }}"
           done
 
           # Copy tests-metadata.json for reference in artifact
-          cp tests-metadata.json "${{ runner.temp }}/pack/tests-metadata.json"
+          cp "${{ github.workspace }}/tests-metadata.json" "${{ runner.temp }}/pack/tests-metadata.json"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
