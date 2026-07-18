@@ -24,12 +24,6 @@ jobs:
             goarch: amd64
             ext: ""
             artifact: linux-amd64
-          - os: ubuntu-latest
-            goos: linux
-            goarch: arm64
-            ext: ""
-            artifact: linux-arm64
-            use_docker: true
           - os: macos-13
             goos: darwin
             goarch: amd64
@@ -47,7 +41,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Go
-        if: ${{ !matrix.use_docker }}
         uses: actions/setup-go@v5
         with:
           go-version: '1.26'
@@ -60,29 +53,7 @@ jobs:
           sudo apt-get install -y libglfw3-dev libgl1-mesa-dev \
             libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev
 
-      - name: Set up QEMU for linux/arm64
-        if: matrix.use_docker
-        uses: docker/setup-qemu-action@v3
-
-      - name: Build linux/arm64 (via Docker + QEMU)
-        if: matrix.use_docker
-        run: |
-          TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
-          docker run --rm --platform linux/arm64 \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            arm64v8/golang:1.26-bookworm \
-            bash -c "
-              apt-get update && apt-get install -y libglfw3-dev libgl1-mesa-dev libxi-dev libxcursor-dev libxrandr-dev libxinerama-dev >/dev/null 2>&1
-              mkdir -p /workspace/output/linux-arm64
-              for test in $TESTS; do
-                echo \"Building \$test...\"
-                go build -o /workspace/output/linux-arm64/\$test ./cmd/\$test
-              done
-            "
-
-      - name: Build all tests (native)
-        if: ${{ !matrix.use_docker }}
+      - name: Build all tests
         shell: bash
         env:
           GOOS: ${{ matrix.goos }}
@@ -90,7 +61,7 @@ jobs:
         run: |
           TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
           for test in $TESTS; do
-            echo "Building $test..."
+            mkdir -p "${{ runner.temp }}/pack/$test"
             go build -o "${{ runner.temp }}/pack/$test/$test${{ matrix.ext }}" "./cmd/$test"
           done
 
@@ -101,43 +72,49 @@ jobs:
           EXT="${{ matrix.ext }}"
           ARTIFACT="${{ matrix.artifact }}"
 
-          # Determine binary source: Docker build puts output elsewhere
-          if [ "${{ matrix.use_docker }}" = "true" ]; then
-            BIN_SRC="${{ github.workspace }}/output/linux-arm64"
-          else
-            BIN_SRC="${{ runner.temp }}/pack"
-          fi
-
           for test in $TESTS; do
             testDir="${{ runner.temp }}/pack/$test"
             mkdir -p "$testDir"
 
-            # Copy binary if from Docker build
-            if [ "${{ matrix.use_docker }}" = "true" ]; then
-              cp "$BIN_SRC/$test" "$testDir/$test"
-            fi
+            # Export variables for Python (avoids bash escaping issues with paths/special chars)
+            export TEST="$test"
+            export TEST_DIR="$testDir"
+            export TEST_EXT="$EXT"
+            export TEST_ARTIFACT="$ARTIFACT"
+            export PACK_DIR="${{ runner.temp }}/pack"
+            export META_FILE="${{ github.workspace }}/tests-metadata.json"
 
-            # Read name and description from tests-metadata.json (export for jq)
-            NAME=$(jq -r ".[\"$test\"].name // \"$test\"" tests-metadata.json)
-            DESC=$(jq -r ".[\"$test\"].description // \"Brak opisu\"" tests-metadata.json)
-            export NAME DESC
+            python3 << 'PYEOF'
+import json, os, pathlib, zipfile
+from datetime import datetime
 
-            # Write meta.json safely using jq (handles special chars)
-            jq -n \
-              --arg name "$NAME" \
-              --arg desc "$DESC" \
-              --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-              '{name: $name, version: 1, description: $desc, lastUpdated: $date, nativeBinary: true}' \
-              > "$testDir/meta.json"
+test = os.environ['TEST']
+test_dir = os.environ['TEST_DIR']
+ext = os.environ['TEST_EXT']
+artifact = os.environ['TEST_ARTIFACT']
+pack_dir = os.environ['PACK_DIR']
+meta_file = os.environ['META_FILE']
 
-            # Create individual zip with binary
-            cd "${{ runner.temp }}/pack"
-            zip -j "$test-$ARTIFACT.zip" "$test/$test$EXT"
+# Read test metadata
+data = json.load(open(meta_file, encoding='utf-8'))
+meta = data.get(test, {})
+name = meta.get('name', test)
+desc = meta.get('description', 'Brak opisu')
+timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
-            # Create .txt file with description (printf is safe with %s)
-            printf '%s\n' "$DESC" > "$test.txt"
+# Write meta.json
+out = {'name': name, 'version': 1, 'description': desc, 'lastUpdated': timestamp, 'nativeBinary': True}
+json.dump(out, open(os.path.join(test_dir, 'meta.json'), 'w'), indent=2, ensure_ascii=False)
 
-            cd "${{ github.workspace }}"
+# Write .txt description file
+pathlib.Path(os.path.join(pack_dir, f'{test}.txt')).write_text(desc, encoding='utf-8')
+
+# Create individual zip with binary
+src = os.path.join(test_dir, f'{test}{ext}')
+dst = os.path.join(pack_dir, f'{test}-{artifact}.zip')
+with zipfile.ZipFile(dst, 'w', zipfile.ZIP_DEFLATED) as zf:
+    zf.write(src, os.path.basename(src))
+PYEOF
           done
 
           # Copy tests-metadata.json for reference in artifact
