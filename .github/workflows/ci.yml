@@ -24,7 +24,7 @@ jobs:
             goarch: amd64
             ext: ""
             artifact: linux-amd64
-          - os: macos-13
+          - os: macos-15
             goos: darwin
             goarch: amd64
             ext: ""
@@ -59,8 +59,10 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
+          go env GOOS GOARCH CGO_ENABLED
           TESTS="bystreOczko corsi fabrykaFigur goNoGo goNoGoBiegacze nwstecz pingPong samochodzik semafor stop stroop sygnalizacja zlapSygnal"
           for test in $TESTS; do
+            echo "Building $test..."
             mkdir -p "${{ runner.temp }}/pack/$test"
             go build -o "${{ runner.temp }}/pack/$test/$test${{ matrix.ext }}" "./cmd/$test"
           done
@@ -80,7 +82,7 @@ jobs:
             export TEST_ARTIFACT="$ARTIFACT"
             export PACK_DIR="${{ runner.temp }}/pack"
             export META_FILE="${{ github.workspace }}/tests-metadata.json"
-            python3 "${{ github.workspace }}/ci/package-tests.py"
+            python "${{ github.workspace }}/ci/package-tests.py"
           done
           cp "${{ github.workspace }}/tests-metadata.json" "${{ runner.temp }}/pack/tests-metadata.json"
 
