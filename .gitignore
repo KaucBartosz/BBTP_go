@@ -1,6 +1,7 @@
 *.exe
 *.test
 *.out
+*.zip
 .vscode/
+build/
 results.json
-przejscie_na_binarki_testy.md
