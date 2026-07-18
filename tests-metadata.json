@@ -2,66 +2,66 @@
   "bystreOczko": {
     "name": "Bystre Oczko",
     "description": "Test na czas reakcji, polegający na jak najszybszym wciśnięciu sygnalizatora zapalonego na zielono",
-    "version": 1
+    "version": "1.0.0"
   },
   "corsi": {
     "name": "Corsi",
     "description": "Test polegający na zapamiętywaniu sekwencji zapalenia świateł",
-    "version": 1
+    "version": "1.0.0"
   },
   "fabrykaFigur": {
     "name": "Fabryka Figur",
     "description": "Na dole ekranu będą przesuwać się różne figury, a twoim zadaniem jest naciskanie na wybrane z nich.",
-    "version": 1
+    "version": "1.0.0"
   },
   "goNoGo": {
     "name": "GoNoGo",
     "description": "Test typu Go NoGo na liczbach parzystych i nieparzystych (0 to liczba parzysta)",
-    "version": 1
+    "version": "1.0.0"
   },
   "goNoGoBiegacze": {
     "name": "Go|NoGo - Biegacze",
     "description": "Test Go|NoGo do badania biegaczy",
-    "version": 1
+    "version": "1.0.0"
   },
   "nwstecz": {
     "name": "NWstecz",
     "description": "Test polega na pamiętaniu liczby która pojawiła się N liczb wcześniej (od 1 do 5)",
-    "version": 1
+    "version": "1.0.0"
   },
   "pingPong": {
     "name": "Ping Pong",
     "description": "Test na koordynacji wzrokowo-ruchowej (oburęcznej).",
-    "version": 1
+    "version": "1.0.0"
   },
   "samochodzik": {
     "name": "Samochód",
     "description": "Test polegający na przejechaniu labiryntu.",
-    "version": 1
+    "version": "1.0.0"
   },
   "semafor": {
     "name": "Semafor",
     "description": "Test na Semaforze, często spotykany przy badaniach kierowców.",
-    "version": 1
+    "version": "1.0.0"
   },
   "stop": {
     "name": "STOP",
     "description": "Test na reakcję na pojawienie się znaku STOP",
-    "version": 1
+    "version": "1.0.0"
   },
   "stroop": {
     "name": "Stroop",
     "description": "Test w stylu testu Stroop",
-    "version": 1
+    "version": "1.0.0"
   },
   "sygnalizacja": {
     "name": "Sygnalizacja",
     "description": "Test na czas reakcji zmiany światła na skrzyżowaniu",
-    "version": 1
+    "version": "1.0.0"
   },
   "zlapSygnal": {
     "name": "Złap Sygnał",
     "description": "Polega na tym, że na ekranie w losowych miejscach i w krótkich odstępach czasu pojawiają się czerwone kółka, a ty musisz na to zareagować!",
-    "version": 1
+    "version": "1.0.0"
   }
 }
