@@ -15,7 +15,7 @@ desc = meta.get('description', 'Brak opisu')
 timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
 out = {'name': name, 'version': 1, 'description': desc, 'lastUpdated': timestamp, 'nativeBinary': True}
-json.dump(out, open(os.path.join(test_dir, 'meta.json'), 'w'), indent=2, ensure_ascii=False)
+json.dump(out, open(os.path.join(test_dir, 'meta.json'), 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
 
 pathlib.Path(os.path.join(pack_dir, f'{test}.txt')).write_text(desc, encoding='utf-8')
 
