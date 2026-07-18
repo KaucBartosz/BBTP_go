@@ -12,9 +12,10 @@ data = json.load(open(meta_file, encoding='utf-8'))
 meta = data.get(test, {})
 name = meta.get('name', test)
 desc = meta.get('description', 'Brak opisu')
+version = meta.get('version', '1.0.0')
 timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
 
-out = {'name': name, 'version': 1, 'description': desc, 'lastUpdated': timestamp, 'nativeBinary': True}
+out = {'name': name, 'version': version, 'description': desc, 'lastUpdated': timestamp, 'nativeBinary': True}
 json.dump(out, open(os.path.join(test_dir, 'meta.json'), 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
 
 pathlib.Path(os.path.join(pack_dir, f'{test}.txt')).write_text(desc, encoding='utf-8')

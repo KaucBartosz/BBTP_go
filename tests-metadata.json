@@ -7,7 +7,7 @@
   "corsi": {
     "name": "Corsi",
     "description": "Test polegający na zapamiętywaniu sekwencji zapalenia świateł",
-    "version": "1.0.0"
+    "version": "1.0.1"
   },
   "fabrykaFigur": {
     "name": "Fabryka Figur",
